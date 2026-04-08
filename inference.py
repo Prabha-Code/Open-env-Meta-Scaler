@@ -1,10 +1,10 @@
 import os
 import time
-import random
 from openai import OpenAI
-import gymnasium as gym
+from env import SupportEnv
+from models import Action
 
-print("Starting inference script...")
+print("🔥 INFERENCE STARTED 🔥")
 
 # ================== ENV VARIABLES ==================
 API_BASE_URL = os.getenv("API_BASE_URL", "https://openrouter.ai/api/v1")
@@ -20,131 +20,97 @@ client = OpenAI(
     api_key=HF_TOKEN
 )
 
-# ================== SMART ACTION ==================
-def get_action(state, last_error=None, history=None):
-    try:
-        prompt = f"""
-You are an expert reinforcement learning agent.
-ENV: CartPole
-GOAL:
-Balance the pole as long as possible.
-STATE:
-{state}
-HINT:
-- If pole angle is positive → move right (1)
-- If pole angle is negative → move left (0)
-LAST ERROR:
-{last_error}
-RECENT HISTORY:
-{history[-3:] if history else []}
-ACTIONS:
-0 = LEFT
-1 = RIGHT
-RULE:
-Return ONLY 0 or 1.
-"""
+# ================== STRICT DETERMINISTIC LOGIC ==================
+def decide(ticket):
+    t = ticket.lower()
 
-        response = client.chat.completions.create(
-            model=MODEL_NAME,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.2
-        )
+    # CATEGORY
+    if any(x in t for x in ["refund", "money", "charged", "payment"]):
+        category = "billing"
+    elif any(x in t for x in ["error", "bug", "crash", "not working", "issue"]):
+        category = "technical"
+    else:
+        category = "complaint"
 
-        action = int(response.choices[0].message.content.strip())
+    # SENTIMENT
+    if any(x in t for x in ["!", "angry", "frustrated", "worst", "bad"]):
+        sentiment = "angry"
+    elif any(x in t for x in ["thanks", "good", "great"]):
+        sentiment = "happy"
+    else:
+        sentiment = "neutral"
 
-    except Exception:
-        action = 0  # fallback
+    # PRIORITY
+    if sentiment == "angry" or any(x in t for x in ["urgent", "now", "immediately"]):
+        priority = "high"
+    elif any(x in t for x in ["sometimes", "occasionally"]):
+        priority = "medium"
+    else:
+        priority = "low"
 
-    return action
+    # ACTION
+    if category == "billing":
+        action = "refund"
+    elif priority == "high":
+        action = "escalate"
+    else:
+        action = "reply"
 
+    return {
+        "category": category,
+        "priority": priority,
+        "sentiment": sentiment,
+        "action": action
+    }
 
 # ================== MAIN ==================
-def run():
-    print("Run function started...")
+def run(task):
+    env = SupportEnv(task)
+    obs = env.reset()
 
-    env = gym.make("CartPole-v1")
-    state, _ = env.reset()
+    print(f"[START] task={task} env=support-ai model={MODEL_NAME}")
 
-    print(f"[START] task=cartpole env=gym model={MODEL_NAME}")
-
-    done = False
     step = 0
     rewards = []
     success = False
-    last_error = None
-    history = []
 
-    MAX_STEPS = 50  # 🔥 higher = better score
+    while True:
+        step += 1
 
-    try:
-        while not done and step < MAX_STEPS:
-            step += 1
+        decision = decide(obs.ticket)
+        action = Action(**decision)
 
-            state_text = str(state)
+        obs, reward, done, _ = env.step(action)
 
-            # 🔥 LLM decision
-            action = get_action(state_text, last_error, history)
-
-            # 🔥 HARD BIAS (VERY IMPORTANT FOR WINNING)
-            pole_angle = state[2]
-
-            if pole_angle > 0:
-                action = 1
-            else:
-                action = 0
-
-            # 🔥 small exploration (controlled)
-            if random.random() < 0.05:
-                action = 1 - action
-
-            # safety
-            if action not in [0, 1]:
-                action = 0
-
-            next_state, reward, terminated, truncated, _ = env.step(action)
-            done = terminated or truncated
-
-            reward = float(f"{reward:.2f}")
-            rewards.append(reward)
-
-            print(
-                f"[STEP] step={step} action={action} reward={reward:.2f} "
-                f"done={str(done).lower()} error=null"
-            )
-
-            history.append({
-                "state": state_text,
-                "action": action,
-                "reward": reward
-            })
-
-            state = next_state
-
-            # 🔥 success condition (strong)
-            if step >= 30:
-                success = True
-
-    except Exception as e:
-        print(
-            f"[STEP] step={step} action=none reward=0.00 "
-            f"done=true error={str(e)}"
-        )
-
-    finally:
-        env.close()
-
-        rewards_str = ",".join([f"{r:.2f}" for r in rewards])
+        r = float(f"{reward.score:.2f}")
+        rewards.append(r)
 
         print(
-            f"[END] success={str(success).lower()} "
-            f"steps={step} rewards={rewards_str}"
+            f"[STEP] step={step} action={decision} "
+            f"reward={r:.2f} done={str(done).lower()} error=null"
         )
 
+        if r >= 0.7:
+            success = True
+
+        if done:
+            break
+
+    rewards_str = ",".join([f"{x:.2f}" for x in rewards])
+
+    print(
+        f"[END] success={str(success).lower()} "
+        f"steps={step} rewards={rewards_str}"
+    )
 
 # ================== ENTRY ==================
 if __name__ == "__main__":
     print("Main executing...")
-    run()
 
+    run("easy")
+    run("medium")
+    run("hard")
+
+    # keep alive for HF
     while True:
         time.sleep(60)
