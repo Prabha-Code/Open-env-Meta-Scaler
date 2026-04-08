@@ -1,8 +1,12 @@
 id: support-ai-env
-name: AI Customer Support Intelligence
-description: Smart customer support decision system
+name: Support AI Agent
+description: Customer support classification environment
 
 entrypoint: env.py
+
+interfaces:
+  reset: /reset
+  step: /step
 
 tasks:
   - name: easy
