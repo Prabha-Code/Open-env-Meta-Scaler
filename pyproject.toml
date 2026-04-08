@@ -1,0 +1,8 @@
+[project]
+name = "support-ai-env"
+version = "0.1.0"
+dependencies = ["openai", "pydantic"]
+
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
