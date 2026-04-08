@@ -1,0 +1,10 @@
+id: support-ai-env
+name: AI Customer Support Intelligence
+description: Smart customer support decision system
+
+entrypoint: env.py
+
+tasks:
+  - name: easy
+  - name: medium
+  - name: hard
