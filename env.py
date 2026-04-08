@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
+from typing import Optional, Dict
 
 app = FastAPI()
 
@@ -21,10 +22,10 @@ DATA = {
 
 # ================== REQUEST MODELS ==================
 class ResetRequest(BaseModel):
-    task_name: str   # 🔥 FIXED
+    task_name: Optional[str] = "easy"   # ✅ SAFE DEFAULT
 
 class StepRequest(BaseModel):
-    action: dict
+    action: Optional[Dict] = {}
 
 # ================== ENV ==================
 class SupportEnv:
@@ -35,17 +36,15 @@ class SupportEnv:
     def reset(self, task):
         self.data = DATA.get(task, DATA["easy"])
         self.index = 0
-
         return {"ticket": self.data[self.index][0]}
 
     def step(self, action):
-        try:
-            truth = self.data[self.index]
-        except:
+        if self.index >= len(self.data):
             return {"ticket": ""}, 0.0, True
 
-        score = 0.0
+        truth = self.data[self.index]
 
+        score = 0.0
         if action.get("category") == truth[1]:
             score += 0.25
         if action.get("priority") == truth[2]:
@@ -66,8 +65,13 @@ env = SupportEnv()
 
 # ================== API ==================
 @app.post("/reset")
-def reset(req: ResetRequest):
-    obs = env.reset(req.task_name)
+def reset(req: ResetRequest = None):   # ✅ handles empty body
+    try:
+        task = req.task_name if req else "easy"
+    except:
+        task = "easy"
+
+    obs = env.reset(task)
 
     return {
         "observation": obs,
@@ -75,10 +79,11 @@ def reset(req: ResetRequest):
     }
 
 @app.post("/step")
-def step(req: StepRequest):
+def step(req: StepRequest = None):   # ✅ handles empty body
     try:
-        obs, reward, done = env.step(req.action)
-    except Exception:
+        action = req.action if req else {}
+        obs, reward, done = env.step(action)
+    except:
         return {
             "observation": {"ticket": ""},
             "reward": 0.0,
