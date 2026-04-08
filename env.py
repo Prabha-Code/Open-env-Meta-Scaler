@@ -21,38 +21,38 @@ DATA = {
 
 # ================== REQUEST MODELS ==================
 class ResetRequest(BaseModel):
-    task: str
+    task_name: str   # 🔥 FIXED
 
 class StepRequest(BaseModel):
     action: dict
 
-# ================== ENV CLASS ==================
+# ================== ENV ==================
 class SupportEnv:
     def __init__(self):
-        self.task = None
         self.data = []
         self.index = 0
 
     def reset(self, task):
-        self.task = task
-        self.data = DATA[task]
+        self.data = DATA.get(task, DATA["easy"])
         self.index = 0
 
-        return {
-            "ticket": self.data[self.index][0]
-        }
+        return {"ticket": self.data[self.index][0]}
 
     def step(self, action):
-        truth = self.data[self.index]
+        try:
+            truth = self.data[self.index]
+        except:
+            return {"ticket": ""}, 0.0, True
 
         score = 0.0
-        if action["category"] == truth[1]:
+
+        if action.get("category") == truth[1]:
             score += 0.25
-        if action["priority"] == truth[2]:
+        if action.get("priority") == truth[2]:
             score += 0.25
-        if action["sentiment"] == truth[3]:
+        if action.get("sentiment") == truth[3]:
             score += 0.2
-        if action["action"] == truth[4]:
+        if action.get("action") == truth[4]:
             score += 0.3
 
         self.index += 1
@@ -60,21 +60,35 @@ class SupportEnv:
 
         obs = {"ticket": ""} if done else {"ticket": self.data[self.index][0]}
 
-        return obs, score, done
+        return obs, float(score), done
 
 env = SupportEnv()
 
 # ================== API ==================
 @app.post("/reset")
 def reset(req: ResetRequest):
-    obs = env.reset(req.task)
-    return obs
+    obs = env.reset(req.task_name)
+
+    return {
+        "observation": obs,
+        "info": {}
+    }
 
 @app.post("/step")
 def step(req: StepRequest):
-    obs, reward, done = env.step(req.action)
+    try:
+        obs, reward, done = env.step(req.action)
+    except Exception:
+        return {
+            "observation": {"ticket": ""},
+            "reward": 0.0,
+            "done": True,
+            "info": {}
+        }
+
     return {
-        "obs": obs,
-        "reward": reward,
-        "done": done
+        "observation": obs,
+        "reward": float(reward),
+        "done": done,
+        "info": {}
     }
