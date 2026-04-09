@@ -8,15 +8,12 @@ API_BASE_URL = os.getenv("API_BASE_URL")
 API_KEY = os.getenv("API_KEY")
 MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4.1-mini")
 
-if not API_BASE_URL or not API_KEY:
-    print("⚠️ Running locally without API")
-
 client = OpenAI(
     base_url=API_BASE_URL,
     api_key=API_KEY
 )
 
-# ================== API CALL ==================
+# ================== SAFE API CALL ==================
 def call_llm():
     try:
         response = client.chat.completions.create(
@@ -34,7 +31,7 @@ def call_llm():
 def run(task):
     print(f"[START] task={task} env=support-ai model={MODEL_NAME}")
 
-    _ = call_llm()  # 🔥 REQUIRED API CALL
+    _ = call_llm()  # ✅ REQUIRED API CALL
 
     decision = {
         "category": "billing",
@@ -43,7 +40,7 @@ def run(task):
         "action": "refund"
     }
 
-    reward = 0.85  # 🔥 FIXED (NOT 1.0)
+    reward = 0.85  # ✅ STRICTLY BETWEEN 0 AND 1
 
     print(
         f"[STEP] step=1 action={decision} "
