@@ -21,7 +21,7 @@ DATA = {
     ]
 }
 
-# ================== REQUEST MODELS ==================
+# ================== MODELS ==================
 class ResetRequest(BaseModel):
     task_name: Optional[str] = "easy"
 
@@ -40,12 +40,14 @@ class SupportEnv:
         return {"ticket": self.data[self.index][0]}
 
     def step(self, action):
+        # ✅ SAFE END CASE
         if self.index >= len(self.data):
-            return {"ticket": ""}, 0.5, True   # ✅ NEVER 0
+            return {"ticket": ""}, 0.5, True
 
         truth = self.data[self.index]
 
-        score = 0.0
+        # ================== BULLETPROOF SCORING ==================
+        score = 0.1  # 🔥 NEVER ZERO
 
         if action.get("category") == truth[1]:
             score += 0.2
@@ -56,8 +58,7 @@ class SupportEnv:
         if action.get("action") == truth[4]:
             score += 0.2
 
-        # ================== FINAL SAFE SCORE ==================
-        # ALWAYS between (0,1)
+        # 🔥 FINAL GUARANTEE
         score = max(0.1, min(score, 0.9))
 
         self.index += 1
@@ -92,7 +93,7 @@ def step(req: StepRequest = None):
     except Exception:
         return {
             "observation": {"ticket": ""},
-            "reward": 0.5,  # ✅ NEVER 0
+            "reward": 0.5,  # ✅ SAFE VALUE
             "done": True,
             "info": {}
         }
@@ -104,7 +105,7 @@ def step(req: StepRequest = None):
         "info": {}
     }
 
-# ================== MAIN ENTRY ==================
+# ================== MAIN ==================
 def main():
     uvicorn.run("server.app:app", host="0.0.0.0", port=7860)
 
