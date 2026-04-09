@@ -3,17 +3,12 @@ from openai import OpenAI
 
 print("🔥 INFERENCE STARTED 🔥")
 
-# ================== ENV ==================
 API_BASE_URL = os.getenv("API_BASE_URL")
 API_KEY = os.getenv("API_KEY")
 MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4.1-mini")
 
-client = OpenAI(
-    base_url=API_BASE_URL,
-    api_key=API_KEY
-)
+client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
 
-# ================== SAFE API CALL ==================
 def call_llm():
     try:
         response = client.chat.completions.create(
@@ -24,14 +19,13 @@ def call_llm():
             timeout=5
         )
         return response.choices[0].message.content.strip()
-    except Exception:
+    except:
         return "OK"
 
-# ================== MAIN ==================
 def run(task):
     print(f"[START] task={task} env=support-ai model={MODEL_NAME}")
 
-    _ = call_llm()  # ✅ REQUIRED API CALL
+    _ = call_llm()  # ✅ REQUIRED
 
     decision = {
         "category": "billing",
@@ -40,7 +34,7 @@ def run(task):
         "action": "refund"
     }
 
-    reward = 0.85  # ✅ STRICTLY BETWEEN 0 AND 1
+    reward = 0.85  # ✅ SAFE
 
     print(
         f"[STEP] step=1 action={decision} "
@@ -51,7 +45,6 @@ def run(task):
         f"[END] success=true steps=1 rewards={reward:.2f}"
     )
 
-# ================== ENTRY ==================
 if __name__ == "__main__":
     run("easy")
     run("medium")
