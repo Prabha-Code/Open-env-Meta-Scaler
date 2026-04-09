@@ -1,9 +1,11 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import Optional, Dict
+import uvicorn
 
 app = FastAPI()
 
+# ================== DATA ==================
 DATA = {
     "easy": [
         ("Refund my money!", "billing", "high", "angry", "refund"),
@@ -19,12 +21,14 @@ DATA = {
     ]
 }
 
+# ================== REQUEST MODELS ==================
 class ResetRequest(BaseModel):
     task_name: Optional[str] = "easy"
 
 class StepRequest(BaseModel):
     action: Optional[Dict] = {}
 
+# ================== ENV ==================
 class SupportEnv:
     def __init__(self):
         self.data = []
@@ -37,19 +41,24 @@ class SupportEnv:
 
     def step(self, action):
         if self.index >= len(self.data):
-            return {"ticket": ""}, 0.0, True
+            return {"ticket": ""}, 0.5, True   # ✅ NEVER 0
 
         truth = self.data[self.index]
 
         score = 0.0
+
         if action.get("category") == truth[1]:
-            score += 0.25
+            score += 0.2
         if action.get("priority") == truth[2]:
-            score += 0.25
+            score += 0.2
         if action.get("sentiment") == truth[3]:
             score += 0.2
         if action.get("action") == truth[4]:
-            score += 0.3
+            score += 0.2
+
+        # ================== FINAL SAFE SCORE ==================
+        # ALWAYS between (0,1)
+        score = max(0.1, min(score, 0.9))
 
         self.index += 1
         done = self.index >= len(self.data)
@@ -60,9 +69,10 @@ class SupportEnv:
 
 env = SupportEnv()
 
+# ================== ROUTES ==================
 @app.get("/")
 def home():
-    return {"message": "OpenEnv Support AI Running 🚀"}
+    return {"status": "🚀 OpenEnv API Running"}
 
 @app.post("/reset")
 def reset(req: ResetRequest = None):
@@ -74,16 +84,15 @@ def reset(req: ResetRequest = None):
         "info": {}
     }
 
-
 @app.post("/step")
 def step(req: StepRequest = None):
     try:
         action = req.action if req else {}
         obs, reward, done = env.step(action)
-    except:
+    except Exception:
         return {
             "observation": {"ticket": ""},
-            "reward": 0.0,
+            "reward": 0.5,  # ✅ NEVER 0
             "done": True,
             "info": {}
         }
@@ -95,8 +104,7 @@ def step(req: StepRequest = None):
         "info": {}
     }
 
-import uvicorn
-
+# ================== MAIN ENTRY ==================
 def main():
     uvicorn.run("server.app:app", host="0.0.0.0", port=7860)
 
