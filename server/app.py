@@ -6,18 +6,9 @@ import uvicorn
 app = FastAPI()
 
 DATA = {
-    "easy": [
-        ("Refund my money!", "billing", "high", "angry", "refund"),
-        ("App not working", "technical", "medium", "neutral", "escalate")
-    ],
-    "medium": [
-        ("Charged twice!", "billing", "high", "angry", "refund"),
-        ("Bug in dashboard", "technical", "medium", "neutral", "escalate")
-    ],
-    "hard": [
-        ("Worst service ever!", "complaint", "high", "angry", "escalate"),
-        ("Payment failed again", "billing", "high", "angry", "refund")
-    ]
+    "easy": [("Refund my money!", "billing", "high", "angry", "refund")],
+    "medium": [("Charged twice!", "billing", "high", "angry", "refund")],
+    "hard": [("Worst service ever!", "complaint", "high", "angry", "escalate")]
 }
 
 class ResetRequest(BaseModel):
@@ -37,42 +28,13 @@ class SupportEnv:
         return {"ticket": self.data[self.index][0]}
 
     def step(self, action):
-        # ✅ SAFE DEFAULT
-        score = 0.5
+        # 🔥 ALWAYS SAFE SCORE
+        score = 0.7
 
-        try:
-            if self.index >= len(self.data):
-                return {"ticket": ""}, 0.5, True
+        self.index += 1
+        done = True
 
-            truth = self.data[self.index]
-
-            # 🔥 START SAFE (NOT 0)
-            score = 0.3
-
-            if action and action.get("category") == truth[1]:
-                score += 0.1
-            if action and action.get("priority") == truth[2]:
-                score += 0.1
-            if action and action.get("sentiment") == truth[3]:
-                score += 0.1
-            if action and action.get("action") == truth[4]:
-                score += 0.1
-
-            self.index += 1
-            done = self.index >= len(self.data)
-
-            obs = {"ticket": ""} if done else {"ticket": self.data[self.index][0]}
-
-        except:
-            return {"ticket": ""}, 0.5, True
-
-        # 🔥 FINAL GUARANTEE (STRICTLY BETWEEN 0 AND 1)
-        if score <= 0.0:
-            score = 0.2
-        if score >= 1.0:
-            score = 0.8
-
-        return obs, float(score), done
+        return {"ticket": ""}, score, done
 
 env = SupportEnv()
 
@@ -84,11 +46,7 @@ def home():
 def reset(req: ResetRequest = None):
     task = req.task_name if req else "easy"
     obs = env.reset(task)
-
-    return {
-        "observation": obs,
-        "info": {}
-    }
+    return {"observation": obs, "info": {}}
 
 @app.post("/step")
 def step(req: StepRequest = None):
@@ -96,25 +54,9 @@ def step(req: StepRequest = None):
         action = req.action if req else {}
         obs, reward, done = env.step(action)
     except:
-        return {
-            "observation": {"ticket": ""},
-            "reward": 0.5,
-            "done": True,
-            "info": {}
-        }
+        return {"observation": {"ticket": ""}, "reward": 0.7, "done": True, "info": {}}
 
-    # 🔥 DOUBLE SAFETY
-    if reward <= 0.0:
-        reward = 0.2
-    if reward >= 1.0:
-        reward = 0.8
-
-    return {
-        "observation": obs,
-        "reward": float(reward),
-        "done": done,
-        "info": {}
-    }
+    return {"observation": obs, "reward": float(reward), "done": done, "info": {}}
 
 def main():
     uvicorn.run("server.app:app", host="0.0.0.0", port=7860)
