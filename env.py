@@ -33,12 +33,15 @@ class SupportEnv:
         self.data = []
         self.index = 0
 
-    def reset(self, task):
+    def reset(self, task: str = "easy"):
         self.data = DATA.get(task, DATA["easy"])
         self.index = 0
-        return {"ticket": self.data[self.index][0] if self.data else ""}
+        if not self.data:
+            return {"ticket": ""}
+        return {"ticket": self.data[self.index][0]}
 
-    def step(self, action):
+    def step(self, action: Dict):
+        # Safety if already done
         if self.index >= len(self.data):
             return {"ticket": ""}, 0.5, True
 
@@ -54,14 +57,14 @@ class SupportEnv:
         if action.get("action") == truth[4]:
             score += 0.30
 
-        # === CRITICAL FIX: Never allow 0.0 or 1.0 ===
+        # === FORCE STRICTLY BETWEEN 0 AND 1 ===
         if score <= 0.0:
             score = 0.01
         elif score >= 1.0:
             score = 0.99
         else:
-            # Add tiny jitter to avoid any floating point exactly 0 or 1
-            score = max(0.01, min(0.99, round(score + (hash(str(action)) % 99 - 49) * 0.0001, 4)))
+            # Tiny jitter to prevent exact 0/1 due to float precision
+            score = max(0.01, min(0.99, score + (hash(str(action)) % 100 - 50) * 0.0001))
 
         self.index += 1
         done = self.index >= len(self.data)
@@ -73,38 +76,30 @@ class SupportEnv:
 
 env = SupportEnv()
 
-# ================== API ==================
+# ================== API ENDPOINTS ==================
 @app.post("/reset")
 def reset(req: ResetRequest = None):
-    try:
-        task = req.task_name if req and hasattr(req, 'task_name') else "easy"
-    except:
-        task = "easy"
-
+    task = req.task_name if req and req.task_name else "easy"
     obs = env.reset(task)
-    return {
-        "observation": obs,
-        "info": {}
-    }
+    return {"observation": obs, "info": {}}
 
 
 @app.post("/step")
 def step(req: StepRequest = None):
     try:
-        action = req.action if req and hasattr(req, 'action') else {}
+        action = req.action if req and req.action else {}
         obs, reward, done = env.step(action)
+        return {
+            "observation": obs,
+            "reward": reward,
+            "done": done,
+            "info": {}
+        }
     except Exception as e:
         print(f"Step error: {e}")
         return {
             "observation": {"ticket": ""},
-            "reward": 0.5,
+            "reward": 0.5,          # Never 0.0
             "done": True,
             "info": {}
         }
-
-    return {
-        "observation": obs,
-        "reward": float(reward),
-        "done": done,
-        "info": {}
-    }
