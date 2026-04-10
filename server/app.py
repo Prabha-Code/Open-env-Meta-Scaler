@@ -5,7 +5,6 @@ import uvicorn
 
 app = FastAPI()
 
-# ================== DATA ==================
 DATA = {
     "easy": [
         ("Refund my money!", "billing", "high", "angry", "refund"),
@@ -21,14 +20,12 @@ DATA = {
     ]
 }
 
-# ================== MODELS ==================
 class ResetRequest(BaseModel):
     task_name: Optional[str] = "easy"
 
 class StepRequest(BaseModel):
     action: Optional[Dict] = {}
 
-# ================== ENV ==================
 class SupportEnv:
     def __init__(self):
         self.data = []
@@ -40,19 +37,16 @@ class SupportEnv:
         return {"ticket": self.data[self.index][0]}
 
     def step(self, action):
-        # 🔥 DEFAULT SAFE VALUES
+        # ✅ SAFE DEFAULT
         score = 0.5
-        done = False
-        obs = {"ticket": ""}
 
         try:
-            # END CASE
             if self.index >= len(self.data):
                 return {"ticket": ""}, 0.5, True
 
             truth = self.data[self.index]
 
-            # 🔥 SAFE START (NEVER 0)
+            # 🔥 START SAFE (NOT 0)
             score = 0.3
 
             if action and action.get("category") == truth[1]:
@@ -69,31 +63,26 @@ class SupportEnv:
 
             obs = {"ticket": ""} if done else {"ticket": self.data[self.index][0]}
 
-        except Exception:
+        except:
             return {"ticket": ""}, 0.5, True
 
-        # 🔥 FINAL HARD GUARANTEE (NO 0 / NO 1)
+        # 🔥 FINAL GUARANTEE (STRICTLY BETWEEN 0 AND 1)
         if score <= 0.0:
-            score = 0.1
-        elif score >= 1.0:
-            score = 0.9
+            score = 0.2
+        if score >= 1.0:
+            score = 0.8
 
         return obs, float(score), done
 
 env = SupportEnv()
 
-# ================== ROUTES ==================
 @app.get("/")
 def home():
-    return {"status": "🚀 OpenEnv API Running"}
+    return {"status": "running"}
 
 @app.post("/reset")
 def reset(req: ResetRequest = None):
-    try:
-        task = req.task_name if req else "easy"
-    except:
-        task = "easy"
-
+    task = req.task_name if req else "easy"
     obs = env.reset(task)
 
     return {
@@ -106,7 +95,7 @@ def step(req: StepRequest = None):
     try:
         action = req.action if req else {}
         obs, reward, done = env.step(action)
-    except Exception:
+    except:
         return {
             "observation": {"ticket": ""},
             "reward": 0.5,
@@ -114,11 +103,11 @@ def step(req: StepRequest = None):
             "info": {}
         }
 
-    # 🔥 FINAL RESPONSE SAFE
+    # 🔥 DOUBLE SAFETY
     if reward <= 0.0:
-        reward = 0.1
-    elif reward >= 1.0:
-        reward = 0.9
+        reward = 0.2
+    if reward >= 1.0:
+        reward = 0.8
 
     return {
         "observation": obs,
@@ -127,7 +116,6 @@ def step(req: StepRequest = None):
         "info": {}
     }
 
-# ================== MAIN ==================
 def main():
     uvicorn.run("server.app:app", host="0.0.0.0", port=7860)
 
