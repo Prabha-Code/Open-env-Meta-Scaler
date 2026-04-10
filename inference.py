@@ -1,123 +1,76 @@
-from fastapi import FastAPI
-from pydantic import BaseModel
-from typing import Optional, Dict
-import uvicorn
+import json
+import cv2
+import numpy as np
+import os
+import sys
 
-app = FastAPI()
-
-DATA = {
-    "easy": [
-        ("Refund my money!", "billing", "high", "angry", "refund"),
-        ("App not working", "technical", "medium", "neutral", "escalate")
-    ],
-    "medium": [
-        ("Charged twice!", "billing", "high", "angry", "refund"),
-        ("Bug in dashboard", "technical", "medium", "neutral", "escalate")
-    ],
-    "hard": [
-        ("Worst service ever!", "complaint", "high", "angry", "escalate"),
-        ("Payment failed again", "billing", "high", "angry", "refund")
-    ]
-}
-
-class ResetRequest(BaseModel):
-    task_name: Optional[str] = "easy"
-
-class StepRequest(BaseModel):
-    action: Optional[Dict] = {}
-
-class SupportEnv:
-    def __init__(self):
-        self.data = []
-        self.index = 0
-
-    def reset(self, task):
-        self.data = DATA.get(task, DATA["easy"])
-        self.index = 0
-        return {"ticket": self.data[self.index][0]}
-
-    def step(self, action):
-        # ✅ SAFE DEFAULT
-        score = 0.5
-
-        try:
-            if self.index >= len(self.data):
-                return {"ticket": ""}, 0.5, True
-
-            truth = self.data[self.index]
-
-            # 🔥 START SAFE (NOT 0)
-            score = 0.3
-
-            if action and action.get("category") == truth[1]:
-                score += 0.1
-            if action and action.get("priority") == truth[2]:
-                score += 0.1
-            if action and action.get("sentiment") == truth[3]:
-                score += 0.1
-            if action and action.get("action") == truth[4]:
-                score += 0.1
-
-            self.index += 1
-            done = self.index >= len(self.data)
-
-            obs = {"ticket": ""} if done else {"ticket": self.data[self.index][0]}
-
-        except:
-            return {"ticket": ""}, 0.5, True
-
-        # 🔥 FINAL GUARANTEE (STRICTLY BETWEEN 0 AND 1)
-        if score <= 0.0:
-            score = 0.2
-        if score >= 1.0:
-            score = 0.8
-
-        return obs, float(score), done
-
-env = SupportEnv()
-
-@app.get("/")
-def home():
-    return {"status": "running"}
-
-@app.post("/reset")
-def reset(req: ResetRequest = None):
-    task = req.task_name if req else "easy"
-    obs = env.reset(task)
-
-    return {
-        "observation": obs,
-        "info": {}
-    }
-
-@app.post("/step")
-def step(req: StepRequest = None):
+# -------------------------------
+# 🔹 Core Logic: Reflectivity Estimation
+# -------------------------------
+def predict_reflectivity(image_path):
     try:
-        action = req.action if req else {}
-        obs, reward, done = env.step(action)
-    except:
+        # Check if file exists
+        if not os.path.exists(image_path):
+            return {
+                "status": "error",
+                "message": f"Image not found: {image_path}"
+            }
+
+        # Read image
+        image = cv2.imread(image_path)
+
+        if image is None:
+            return {
+                "status": "error",
+                "message": "Invalid image format"
+            }
+
+        # Convert to grayscale (simulate reflectivity measurement)
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+        # Calculate brightness (proxy for reflectivity)
+        reflectivity_score = float(np.mean(gray)) / 255.0
+
+        # Classify condition
+        if reflectivity_score > 0.7:
+            condition = "Good"
+        elif reflectivity_score > 0.4:
+            condition = "Moderate"
+        else:
+            condition = "Poor"
+
         return {
-            "observation": {"ticket": ""},
-            "reward": 0.5,
-            "done": True,
-            "info": {}
+            "status": "success",
+            "reflectivity_score": round(reflectivity_score, 3),
+            "condition": condition
         }
 
-    # 🔥 DOUBLE SAFETY
-    if reward <= 0.0:
-        reward = 0.2
-    if reward >= 1.0:
-        reward = 0.8
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": str(e)
+        }
 
-    return {
-        "observation": obs,
-        "reward": float(reward),
-        "done": done,
-        "info": {}
-    }
 
-def main():
-    uvicorn.run("server.app:app", host="0.0.0.0", port=7860)
-
+# -------------------------------
+# 🔹 Main Entry Point
+# -------------------------------
 if __name__ == "__main__":
-    main()
+    try:
+        # Hackathon input format (can be modified based on requirement)
+        if len(sys.argv) > 1:
+            image_path = sys.argv[1]
+        else:
+            # Default test image
+            image_path = "test.jpg"
+
+        result = predict_reflectivity(image_path)
+
+        # Print output as JSON (VERY IMPORTANT)
+        print(json.dumps(result))
+
+    except Exception as e:
+        print(json.dumps({
+            "status": "error",
+            "message": str(e)
+        }))
