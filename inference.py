@@ -32,7 +32,7 @@ def run(task):
         "action": "refund"
     }
 
-    reward = 0.73  # ✅ SAFE VALUE
+    reward = 0.73
 
     print(f"[STEP] step=1 action={decision} reward={reward} done=true error=null")
     print(f"[END] success=true steps=1 rewards={reward}")
